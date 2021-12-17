@@ -3,4 +3,5 @@
 
 void Beep() { 
         printf("\a");
+        fflush(stdout);
 }                    
