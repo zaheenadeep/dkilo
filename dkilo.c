@@ -17,9 +17,17 @@ enum stdfd {
 
 struct termios oldtty;
 
+
+/*** output ***/
+static void refreshscreen() {
+	write(SOUT, "\x1b[2J", 4); /* reset */
+	write(SOUT, "\x1b[H", 3); /* cursor back */
+}
+
 /*** terminal ***/
 
 static void die(const char *msg) {
+	refreshscreen();
 	perror(msg);
 	exit(EXIT_FAILURE);
 }
@@ -65,15 +73,12 @@ static char grabkey() {
 static char processkey(char key) {
 	switch (key) {
 	case KEY_CTRL('q'):
+		refreshscreen();
 		exit(EXIT_SUCCESS);
 		break;
 	}
 }
 
-/*** output ***/
-static void refreshscreen() {
-	write(SOUT, "\x1b[2J", 4);
-}
 
 
 /*** init ***/
@@ -83,7 +88,7 @@ int main() {
 
 	for (;;) {
 		refreshscreen();
-		processkey(c = grabkey());
+		processkey(grabkey());
 	}
 
 	
