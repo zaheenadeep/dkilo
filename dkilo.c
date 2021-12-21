@@ -17,16 +17,18 @@ enum stdfd {
 
 struct termios oldtty;
 
+/*** terminal ***/
+
 static void die(const char *msg) {
 	perror(msg);
 	exit(EXIT_FAILURE);
 }
 
-void termexit() {
+static void termexit() {
 	tcsetattr(SIN, TCSAFLUSH, &oldtty);
 }
 
-void terminit() {
+static void terminit() {
 	int e;
 	struct termios tty;
 	
@@ -45,21 +47,39 @@ void terminit() {
 	
 	e = tcsetattr(SIN, TCSAFLUSH, &tty);
 	if (e < 0) die("tcsetattr");
-}	
+}
+
+/*** input ***/
+
+static char grabkey() {
+	int nread;
+	char c;
+
+	while ((nread = read(SIN, &c, 1)) < 1)
+		if (nread < 0 && errno != EAGAIN)
+			die("read");
+
+	return c;
+}
+
+static char processkey(char key) {
+	switch (key) {
+	case KEY_CTRL('q'):
+		exit(EXIT_SUCCESS);
+		break;
+	}
+}
+
+
+/*** init ***/
 
 int main() {
-	int e;
-	char c;
-	
 	terminit();
 
-	do {
-		c = '\0';
-		e = read(SIN, &c, 1);
-		if (e < 0 && errno != EAGAIN) die("read");
-		
-		printf("%d\r\n", c);
-	} while (c != KEY_CTRL('q'));
+	while (1) {
+		processkey(grabkey());
+	}
+
 	
 	return 0;
 }
