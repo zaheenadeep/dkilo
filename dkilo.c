@@ -70,14 +70,20 @@ static char processkey(char key) {
 	}
 }
 
+/*** output ***/
+static void refreshscreen() {
+	write(SOUT, "\x1b[2J", 4);
+}
+
 
 /*** init ***/
 
 int main() {
 	terminit();
 
-	while (1) {
-		processkey(grabkey());
+	for (;;) {
+		refreshscreen();
+		processkey(c = grabkey());
 	}
 
 	
