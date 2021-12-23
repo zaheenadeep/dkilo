@@ -24,6 +24,11 @@ struct edconfig {
 
 struct edconfig E;
 
+/* returns true if nbytes is written; false otherwise */
+static int ewrite(int fd, const void *buf, size_t nbytes) {
+	return write(fd, buf, nbytes) != nbytes;
+}
+
 /*** output ***/
 static void cursortotop() {
 	write(SOUT, "\x1b[H", 3); /* cursor back */
@@ -83,23 +88,8 @@ static void terminit() {
 }
 
 
-static int fetchdims(int *rows, int *cols) {
-	struct winsize ws;
-	
-	if (ioctl(SOUT, TIOCGWINSZ, &ws) == -1
-	    || ws.ws_col == 0)
-		return -1;
-	else {
-		*rows = ws.ws_row;
-		*cols = ws.ws_col;
-		return 0;
-	}
-}
-
-
 /*** input ***/
-
-static char grabkey() {
+static char getkey() {
 	int nread;
 	char c;
 
@@ -121,11 +111,37 @@ static char processkey(char key) {
 	}
 }
 
+static int fetchcursorpos(int *rp, int *cp) {
+	char c;
+	
+	if (ewrite(SOUT, "\x1b[6n", 4)) return -1;
+	if (scanf("\x1b[%d;%d", rp, cp) < 2) return -1;
+	
+	return 0;
+}
+
+static int fetchdims(int *rp, int *cp) {
+	struct winsize ws;
+	
+	if (1 || ioctl(SOUT, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+		const int NBYTES = 12, MAXDIM = 999;
+		/* go MAXR slots right and down */
+		if (printf("\x1b[%dC\x1b[%dB", MAXDIM, MAXDIM) != NBYTES)
+			return -1;
+		fflush(stdout);
+		return fetchcursorpos(rp, cp);
+	}
+	else {
+		*rp = ws.ws_row;
+		*cp = ws.ws_col;
+		return 0;
+	}
+}
 
 /*** init ***/
 
 static void Einit() {
-	if (fetchdims(&E.rows, &E.cols) == -1) die("fetchdims");
+	if (fetchdims(&E.rows, &E.cols) < 0) die("fetchdims");	
 }
 
 int main() {
@@ -134,7 +150,7 @@ int main() {
 
 	for (;;) {
 		refreshscreen();
-		processkey(grabkey());
+		processkey(getkey());
 	}
 
 	
