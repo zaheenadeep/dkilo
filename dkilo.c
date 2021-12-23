@@ -115,7 +115,7 @@ static int fetchcursorpos(int *rp, int *cp) {
 	char c;
 	
 	if (ewrite(SOUT, "\x1b[6n", 4)) return -1;
-	if (scanf("\x1b[%d;%d", rp, cp) < 2) return -1;
+	if (scanf("\x1b[%d;%d", rp, cp) != 2) return -1;
 	
 	return 0;
 }
@@ -123,9 +123,9 @@ static int fetchcursorpos(int *rp, int *cp) {
 static int fetchdims(int *rp, int *cp) {
 	struct winsize ws;
 	
-	if (1 || ioctl(SOUT, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+	if (ioctl(SOUT, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
 		const int NBYTES = 12, MAXDIM = 999;
-		/* go MAXR slots right and down */
+		/* go MAXDIM slots right and down */
 		if (printf("\x1b[%dC\x1b[%dB", MAXDIM, MAXDIM) != NBYTES)
 			return -1;
 		fflush(stdout);
