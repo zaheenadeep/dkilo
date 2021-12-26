@@ -11,6 +11,9 @@
 #define KEY_CTRL(c) ((c)&0x1f)
 #define AB_INIT {NULL, 0}
 
+#define VT_CURSOR_HOME "\x1b[H"
+#define VT_ERASE_ALL "\x1b[2J"
+
 /* shortcuts */
 enum stdfd {
 	SIN  = STDIN_FILENO,
@@ -39,8 +42,8 @@ static int ewrite(int fd, const void *buf, size_t nbytes) {
 
 /* reset screen with write */
 static void wreset() {
-	write(SOUT, "\x1b[2J", 4); /* reset */
-	write(SOUT, "\x1b[H", 3);  /* cursor back */
+	write(SOUT, VT_ERASE_ALL, 4); /* reset */
+	write(SOUT, VT_CURSOR_HOME, 3);  /* cursor back */
 }
 
 /*** terminal ***/
@@ -105,11 +108,11 @@ static void refreshscreen() {
 	AppendBuffer ab = AB_INIT;
 
 	/* wreset with abappend */
-	abappend(&ab, "\x1b[2J", 4); /* reset */
-	abappend(&ab, "\x1b[H", 3); /* cursor back */
+	abappend(&ab, VT_ERASE_ALL, 4); /* reset */
+	abappend(&ab, VT_CURSOR_HOME, 3); /* cursor back */
 	
 	drawrows(&ab);
-	abappend(&ab, "\x1b[H", 3); /* cursor back */
+	abappend(&ab, VT_CURSOR_HOME, 3); /* cursor back */
 
 	/* flush ab */
 	write(SOUT, ab.data, ab.len);
@@ -146,13 +149,13 @@ static int fetchcursorpos(int *rp, int *cp) {
 	return 0;
 }
 
+#define MAXDIM 999
 static int fetchdims(int *rp, int *cp) {
 	struct winsize ws;
 	
 	if (ioctl(SOUT, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
-		const int NBYTES = 12, MAXDIM = 999;
 		/* go MAXDIM slots right and down */
-		if (printf("\x1b[%dC\x1b[%dB", MAXDIM, MAXDIM) != NBYTES)
+		if (printf("\x1b[%dC\x1b[%dB", MAXDIM, MAXDIM) != 12)
 			return -1;
 		fflush(stdout);
 		return fetchcursorpos(rp, cp);
