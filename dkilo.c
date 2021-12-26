@@ -11,10 +11,17 @@
 #define KEY_CTRL(c) ((c)&0x1f)
 #define AB_INIT {NULL, 0}
 
+#define VT_WRITE(cmd) (write(SOUT, (cmd), (cmd##_N)))
+#define VT_ABAPPEND(abuf, cmd) (abappend((abuf), (cmd), (cmd##_N)))
 #define VT_CURSOR_HOME "\x1b[H"
 #define VT_CURSOR_HOME_N 3
 #define VT_ERASE_ALL "\x1b[2J"
 #define VT_ERASE_ALL_N 4
+#define VT_CURSOR_HIDE "\x1b[?25l"
+#define VT_CURSOR_HIDE_N 6
+#define VT_CURSOR_SHOW "\x1b[?25h"
+#define VT_CURSOR_SHOW_N 6
+
 
 /* shortcuts */
 enum stdfd {
@@ -44,8 +51,8 @@ static int ewrite(int fd, const void *buf, size_t nbytes) {
 
 /* reset screen with write */
 static void wreset() {
-	write(SOUT, VT_ERASE_ALL, VT_ERASE_ALL_N); /* reset */
-	write(SOUT, VT_CURSOR_HOME, VT_CURSOR_HOME_N);  /* cursor back */
+	VT_WRITE(VT_ERASE_ALL);
+	VT_WRITE(VT_CURSOR_HOME);
 }
 
 /*** terminal ***/
@@ -109,12 +116,16 @@ static void drawrows(AppendBuffer *ab) {
 static void refreshscreen() {
 	AppendBuffer ab = AB_INIT;
 
+	VT_ABAPPEND(&ab, VT_CURSOR_HIDE);
+
 	/* wreset with abappend */
-	abappend(&ab, VT_ERASE_ALL, VT_ERASE_ALL_N); /* reset */
-	abappend(&ab, VT_CURSOR_HOME, VT_CURSOR_HOME_N); /* cursor back */
+	VT_ABAPPEND(&ab, VT_ERASE_ALL);
+	VT_ABAPPEND(&ab, VT_CURSOR_HOME);
 	
 	drawrows(&ab);
-	abappend(&ab, VT_CURSOR_HOME, VT_CURSOR_HOME_N); /* cursor back */
+	VT_ABAPPEND(&ab, VT_CURSOR_HOME);
+
+	VT_ABAPPEND(&ab, VT_CURSOR_SHOW);
 
 	/* flush ab */
 	write(SOUT, ab.data, ab.len);
