@@ -36,37 +36,18 @@ static int ewrite(int fd, const void *buf, size_t nbytes) {
 	return write(fd, buf, nbytes) != nbytes;
 }
 
-/*** output ***/
-static void cursortotop() {
-	write(SOUT, "\x1b[H", 3); /* cursor back */
-}
 
-static void resetscreen() {
+/* reset screen with write */
+static void wreset() {
 	write(SOUT, "\x1b[2J", 4); /* reset */
-	cursortotop();
-}
-
-static void drawrows() {
-	int r;
-	for (r = 0; r < E.rows; r++) {
-		write(SOUT, "~", 3);
-		if (r < E.rows - 1)
-			write(SOUT, "\r\n", 2);
-	}
-}
-
-static void refreshscreen() {
-	resetscreen();
-
-	drawrows();
-
-	cursortotop();
+	write(SOUT, "\x1b[H", 3);  /* cursor back */
 }
 
 /*** terminal ***/
 
 static void die(const char *msg) {
-	resetscreen();
+	wreset();
+	
 	perror(msg);
 	exit(EXIT_FAILURE);
 }
@@ -110,6 +91,31 @@ static void abfree(AppendBuffer *ab) {
 	free(ab->data);
 }
 
+/*** output ***/
+static void drawrows(AppendBuffer *ab) {
+	int r;
+	for (r = 0; r < E.rows; r++) {
+		abappend(ab, "~", 1);
+		if (r < E.rows - 1)
+			abappend(ab, "\r\n", 2);
+	}
+}
+
+static void refreshscreen() {
+	AppendBuffer ab = AB_INIT;
+
+	/* wreset with abappend */
+	abappend(&ab, "\x1b[2J", 4); /* reset */
+	abappend(&ab, "\x1b[H", 3); /* cursor back */
+	
+	drawrows(&ab);
+	abappend(&ab, "\x1b[H", 3); /* cursor back */
+
+	/* flush ab */
+	write(SOUT, ab.data, ab.len);
+	abfree(&ab);
+}
+
 /*** input ***/
 static char getkey() {
 	int nread;
@@ -127,15 +133,13 @@ static char getkey() {
 static char processkey(char key) {
 	switch (key) {
 	case KEY_CTRL('q'):
-		resetscreen();
+		wreset();
 		exit(EXIT_SUCCESS);
 		break;
 	}
 }
 
 static int fetchcursorpos(int *rp, int *cp) {
-	char c;
-	
 	if (ewrite(SOUT, "\x1b[6n", 4)) return -1;
 	if (scanf("\x1b[%d;%d", rp, cp) != 2) return -1;
 	
@@ -166,7 +170,7 @@ static void Einit() {
 	if (fetchdims(&E.rows, &E.cols) < 0) die("fetchdims");	
 }
 
-int main() {
+int main() {	
 	terminit();
 	Einit();
 
@@ -174,7 +178,6 @@ int main() {
 		refreshscreen();
 		processkey(getkey());
 	}
-
 	
 	return 0;
 }
