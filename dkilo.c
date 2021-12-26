@@ -6,8 +6,10 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
+#include <string.h>
 
-#define KEY_CTRL(c) ((c) & 0x1f)
+#define KEY_CTRL(c) ((c)&0x1f)
+#define AB_INIT {NULL, 0}
 
 /* shortcuts */
 enum stdfd {
@@ -23,6 +25,11 @@ struct edconfig {
 };
 
 struct edconfig E;
+
+typedef struct apbuf {
+	char *data;
+	char len;
+} AppendBuffer;
 
 /* returns true if nbytes is written; false otherwise */
 static int ewrite(int fd, const void *buf, size_t nbytes) {
@@ -42,7 +49,9 @@ static void resetscreen() {
 static void drawrows() {
 	int r;
 	for (r = 0; r < E.rows; r++) {
-		write(SOUT, "~\r\n", 3);
+		write(SOUT, "~", 3);
+		if (r < E.rows - 1)
+			write(SOUT, "\r\n", 2);
 	}
 }
 
@@ -87,6 +96,19 @@ static void terminit() {
 	if (e < 0) die("tcsetattr");
 }
 
+/*** append buffer ***/
+static void abappend(AppendBuffer *ab, const char *data, int len) {
+	ab->data = realloc(ab->data, ab->len + len);
+	if (ab->data == NULL)
+		return;
+
+	memcpy(ab->data + ab->len, data, len);
+	ab->len += len;
+}
+
+static void abfree(AppendBuffer *ab) {
+	free(ab->data);
+}
 
 /*** input ***/
 static char getkey() {
