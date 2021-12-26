@@ -12,11 +12,13 @@
 #define AB_INIT {NULL, 0}
 
 #define VT_WRITE(cmd) (write(SOUT, (cmd), (cmd##_N)))
-#define VT_ABAPPEND(abuf, cmd) (abappend((abuf), (cmd), (cmd##_N)))
+#define VT_ABAPPEND(abufp, cmd) (abappend((abufp), (cmd), (cmd##_N)))
 #define VT_CURSOR_HOME "\x1b[H"
 #define VT_CURSOR_HOME_N 3
 #define VT_ERASE_ALL "\x1b[2J"
 #define VT_ERASE_ALL_N 4
+#define VT_ERASE_REST_OF_LINE "\x1b[0K"
+#define VT_ERASE_REST_OF_LINE_N 4
 #define VT_CURSOR_HIDE "\x1b[?25l"
 #define VT_CURSOR_HIDE_N 6
 #define VT_CURSOR_SHOW "\x1b[?25h"
@@ -40,11 +42,11 @@ struct edconfig E;
 
 typedef struct apbuf {
 	char *data;
-	char len;
+	int len;
 } AppendBuffer;
 
 /* returns true if nbytes is written; false otherwise */
-static int ewrite(int fd, const void *buf, size_t nbytes) {
+static int ewrite(int fd, const void *buf, int nbytes) {
 	return write(fd, buf, nbytes) != nbytes;
 }
 
@@ -91,10 +93,11 @@ static void terminit() {
 
 /*** append buffer ***/
 static void abappend(AppendBuffer *ab, const char *data, int len) {
-	ab->data = realloc(ab->data, ab->len + len);
-	if (ab->data == NULL)
+	char *new = realloc(ab->data, ab->len + len);
+	if (new == NULL)
 		return;
 
+	ab->data = new;
 	memcpy(ab->data + ab->len, data, len);
 	ab->len += len;
 }
@@ -108,6 +111,7 @@ static void drawrows(AppendBuffer *ab) {
 	int r;
 	for (r = 0; r < E.rows; r++) {
 		abappend(ab, "~", 1);
+		VT_ABAPPEND(ab, VT_ERASE_REST_OF_LINE);
 		if (r < E.rows - 1)
 			abappend(ab, "\r\n", 2);
 	}
@@ -117,17 +121,15 @@ static void refreshscreen() {
 	AppendBuffer ab = AB_INIT;
 
 	VT_ABAPPEND(&ab, VT_CURSOR_HIDE);
-
-	/* wreset with abappend */
-	VT_ABAPPEND(&ab, VT_ERASE_ALL);
-	VT_ABAPPEND(&ab, VT_CURSOR_HOME);
 	
+	VT_ABAPPEND(&ab, VT_CURSOR_HOME);	
 	drawrows(&ab);
 	VT_ABAPPEND(&ab, VT_CURSOR_HOME);
 
 	VT_ABAPPEND(&ab, VT_CURSOR_SHOW);
 
 	/* flush ab */
+	printf("%d\n", ab.len);
 	write(SOUT, ab.data, ab.len);
 	abfree(&ab);
 }
