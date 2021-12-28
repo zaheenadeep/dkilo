@@ -23,7 +23,8 @@
 #define VT_CURSOR_HIDE_N 6
 #define VT_CURSOR_SHOW "\x1b[?25h"
 #define VT_CURSOR_SHOW_N 6
-
+#define VT_RCLF "\r\n"
+#define VT_RCLF_N 2
 
 /* shortcuts */
 enum stdfd {
@@ -33,9 +34,9 @@ enum stdfd {
 };
 
 struct edconfig {
+	int cx, cy;
+	int rows, cols;
 	struct termios oldtty;
-	int rows;
-	int cols;
 };
 
 struct edconfig E;
@@ -110,10 +111,12 @@ static void abfree(AppendBuffer *ab) {
 static void drawrows(AppendBuffer *ab) {
 	int r;
 	for (r = 0; r < E.rows; r++) {
+		
+		
 		abappend(ab, "~", 1);
 		VT_ABAPPEND(ab, VT_ERASE_REST_OF_LINE);
 		if (r < E.rows - 1)
-			abappend(ab, "\r\n", 2);
+			VT_ABAPPEND(ab, VT_RCLF);
 	}
 }
 
@@ -185,6 +188,9 @@ static int fetchdims(int *rp, int *cp) {
 /*** init ***/
 
 static void Einit() {
+	E.cx = 0;
+	E.cy = 0;
+	
 	if (fetchdims(&E.rows, &E.cols) < 0) die("fetchdims");	
 }
 
