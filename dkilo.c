@@ -1,12 +1,13 @@
 #include <errno.h>
-#include <stdio.h>
 #include <err.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
 #include <string.h>
+
 
 #define KEY_CTRL(c) ((c)&0x1f)
 #define AB_INIT {NULL, 0}
@@ -34,9 +35,9 @@ enum stdfd {
 };
 
 struct edconfig {
-	int cx, cy;
-	int rows, cols;
-	struct termios oldtty;
+	int cx, cy;              /* cursor positions, starts from 0 */
+	int rows, cols;          /* row and col count in the terminal */
+	struct termios oldtty;   /* old termios struct */
 };
 
 struct edconfig E;
@@ -111,8 +112,6 @@ static void abfree(AppendBuffer *ab) {
 static void drawrows(AppendBuffer *ab) {
 	int r;
 	for (r = 0; r < E.rows; r++) {
-		
-		
 		abappend(ab, "~", 1);
 		VT_ABAPPEND(ab, VT_ERASE_REST_OF_LINE);
 		if (r < E.rows - 1)
@@ -120,19 +119,24 @@ static void drawrows(AppendBuffer *ab) {
 	}
 }
 
+#define NRBUF 32
 static void refreshscreen() {
 	AppendBuffer ab = AB_INIT;
-
+	char buf[NRBUF];
+	int nscan;
+	
 	VT_ABAPPEND(&ab, VT_CURSOR_HIDE);
 	
 	VT_ABAPPEND(&ab, VT_CURSOR_HOME);	
 	drawrows(&ab);
-	VT_ABAPPEND(&ab, VT_CURSOR_HOME);
 
+	/* move cursor to new position */
+	nscan = snprintf(buf, NRBUF, "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+	abappend(&ab, buf, nscan);
+	
 	VT_ABAPPEND(&ab, VT_CURSOR_SHOW);
 
 	/* flush ab */
-	printf("%d\n", ab.len);
 	write(SOUT, ab.data, ab.len);
 	abfree(&ab);
 }
