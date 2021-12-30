@@ -15,6 +15,11 @@
 #define KEY_DOWN    KEY_ESC1('B')
 #define KEY_RIGHT   KEY_ESC1('C')
 #define KEY_LEFT    KEY_ESC1('D')
+#define KEY_PGUP    KEY_ESC1('5')
+#define KEY_PGDOWN  KEY_ESC1('6')
+#define KEY_HOME    KEY_ESC1('7')
+#define KEY_END     KEY_ESC1('8')
+
 #define AB_INIT     {NULL, 0}
 
 #define VT_WRITE(cmd) (write(SOUT, (cmd), (cmd##_N)))
@@ -150,7 +155,7 @@ static void refreshscreen() {
 /*** input ***/
 static int getkey() {
 	int nread;
-	char c;
+	int c = 0;
 
 	/* keep trying to read 1 byte until successful */
 	while ((nread = read(SIN, &c, 1)) < 1)
@@ -159,14 +164,31 @@ static int getkey() {
 
 	if (c == '\x1b') {		
 		nread = read(SIN, &c, 1);
-		if (nread < 1 || c != '[')
-			return '\x1b';
+		if (nread < 1 || c != '[') return '\x1b';
 
+		c = 0;
 		nread = read(SIN, &c, 1);
-		if (nread < 1)
-			return '\x1b';
+		if (nread < 1) return '\x1b';
 
-		return KEY_ESC1(c);
+                /* for VT100 */
+		/* if c is between 0-9, return if next key not ~ */
+		if (isdigit(c)) {
+			char d;
+			nread = read(SIN, &d, 1);
+			if (nread < 1 || d != '~') return '\x1b';
+		}
+
+		/* for xterm */
+		switch (c) {
+		case 'H':
+			c = KEY_HOME;
+			break;
+		case 'F':
+			c = KEY_END;
+			break;
+		default:
+			return KEY_ESC1(c);
+		}
 	}
 	
 	return c;
@@ -185,6 +207,18 @@ static char processkey(int key) {
 		break;
 	case KEY_RIGHT:
 		if (E.cx < E.cols) E.cx++;
+		break;
+	case KEY_HOME:
+		E.cx = 0;
+		break;
+	case KEY_END:
+		E.cx = E.cols - 1;
+		break;
+	case KEY_PGUP:
+		E.cy = 0;
+		break;
+	case KEY_PGDOWN:
+		E.cy = E.rows - 1;
 		break;
 	case KEY_CTRL('q'):
 		wreset();
