@@ -9,8 +9,13 @@
 #include <string.h>
 
 
-#define KEY_CTRL(c) ((c)&0x1f)
-#define AB_INIT {NULL, 0}
+#define KEY_CTRL(c) ((c) & 0x1f)
+#define KEY_ESC1(c) ((c) | 0x0100)
+#define KEY_UP      KEY_ESC1('A')
+#define KEY_DOWN    KEY_ESC1('B')
+#define KEY_RIGHT   KEY_ESC1('C')
+#define KEY_LEFT    KEY_ESC1('D')
+#define AB_INIT     {NULL, 0}
 
 #define VT_WRITE(cmd) (write(SOUT, (cmd), (cmd##_N)))
 #define VT_ABAPPEND(abufp, cmd) (abappend((abufp), (cmd), (cmd##_N)))
@@ -26,6 +31,7 @@
 #define VT_CURSOR_SHOW_N 6
 #define VT_RCLF "\r\n"
 #define VT_RCLF_N 2
+
 
 /* shortcuts */
 enum stdfd {
@@ -142,21 +148,44 @@ static void refreshscreen() {
 }
 
 /*** input ***/
-static char getkey() {
+static int getkey() {
 	int nread;
 	char c;
 
 	/* keep trying to read 1 byte until successful */
 	while ((nread = read(SIN, &c, 1)) < 1)
 		/* die for non-EAGAIN errors */
-		if (nread < 0 && errno != EAGAIN)
-			die("read");
+		if (nread < 0 && errno != EAGAIN) die("read");
 
+	if (c == '\x1b') {		
+		nread = read(SIN, &c, 1);
+		if (nread < 1 || c != '[')
+			return '\x1b';
+
+		nread = read(SIN, &c, 1);
+		if (nread < 1)
+			return '\x1b';
+
+		return KEY_ESC1(c);
+	}
+	
 	return c;
 }
 
-static char processkey(char key) {
+static char processkey(int key) {
 	switch (key) {
+	case KEY_UP:
+		if (E.cy > 0) E.cy--;
+		break;
+	case KEY_DOWN:
+		if (E.cy < E.rows) E.cy++;
+		break;
+	case KEY_LEFT:
+		if (E.cx > 0) E.cx--;
+		break;
+	case KEY_RIGHT:
+		if (E.cx < E.cols) E.cx++;
+		break;
 	case KEY_CTRL('q'):
 		wreset();
 		exit(EXIT_SUCCESS);
